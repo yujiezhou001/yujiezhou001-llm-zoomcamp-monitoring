@@ -1,5 +1,6 @@
 import streamlit as st
 from assistant import create_assistant
+from db_save import save_conversation
 
 st.set_page_config(page_title="Course Assistant", page_icon="🎓")
 
@@ -32,4 +33,14 @@ if question := st.chat_input("Enter your question…"):
         with st.spinner("Searching the course material…"):
             answer = assistant.rag(question)
         st.write(answer)
+
+        record = assistant.last_call
+        st.write(f"Response time: {record.response_time:.2f}s")
+        st.write(f"Prompt tokens: {record.prompt_tokens}")
+        st.write(f"Completion tokens: {record.completion_tokens}")
+        st.write(f"Cost: ${record.cost:.4f}")
+
+        conversation_id = save_conversation(record, question, "llm-zoomcamp")
+        st.session_state.conversation_id = conversation_id
+        
     st.session_state.messages.append({"role": "assistant", "content": answer})
