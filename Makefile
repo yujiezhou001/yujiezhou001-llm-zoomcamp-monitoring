@@ -24,3 +24,11 @@ query:
 dashboard:
 	lsof -ti :8502 | xargs -r kill -9 || true
 	uv run streamlit run dashboard.py --server.port 8502
+
+grafana:
+	docker run -d \
+		--name grafana \
+		--network monitoring \
+		-p 3000:3000 \
+		-v grafana_data:/var/lib/grafana \
+		grafana/grafana
