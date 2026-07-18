@@ -3,6 +3,9 @@ from assistant import create_assistant
 from db_save import save_conversation
 from db_feedback import save_feedback
 
+from judge import evaluate_relevance
+from db_feedback import save_feedback
+
 st.set_page_config(page_title="Course Assistant", page_icon="🎓")
 
 
@@ -40,13 +43,17 @@ for i, msg in enumerate(st.session_state.messages):
             m = msg["metrics"]
             st.caption(
                 f"⏱ {m['response_time']:.2f}s · "
-                f"🔢 {m['prompt_tokens']}+{m['completion_tokens']} tokens · "
+                f"🔢 {m['prompt_tokens']} tokens · "
+                f"🔢 {m['completion_tokens']} tokens · "
                 f"💲 {m['cost']:.4f}"
             )
 
-            if msg["feedback"] is None:
+            if msg.get("feedback") is None:
                 st.feedback("thumbs", key=f"fb_{i}",
                             on_change=record_feedback, args=(i,))
+            elif isinstance(msg["feedback"], dict):
+                st.caption("Relevance: " + msg["feedback"].get("relevance", "N/A"))
+                st.caption("Explanation: " + msg["feedback"].get("explanation", "N/A"))
             else:
                 st.caption("👍 Thanks for the feedback!" if msg["feedback"] == 1
                            else "👎 Thanks — noted, we'll use it to improve.")
@@ -61,6 +68,14 @@ if question := st.chat_input("Enter your question…"):
     record = assistant.last_call
     conversation_id = save_conversation(record, question, "llm-zoomcamp")
 
+    relevance, explanation = evaluate_relevance(question, answer)
+    save_feedback(
+        conversation_id,
+        "judge",
+        relevance=relevance,
+        explanation=explanation
+    )
+
     st.session_state.messages.append({
         "role": "assistant",
         "content": answer,
@@ -71,6 +86,10 @@ if question := st.chat_input("Enter your question…"):
             "completion_tokens": record.completion_tokens,
             "cost": record.cost,
         },
-        "feedback": None,
+        "feedback": {
+            "relevance": relevance,
+            "explanation": explanation,
+        },
     })
+    
     st.rerun()
