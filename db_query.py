@@ -21,7 +21,7 @@ def get_stats():
                     AVG(response_time),
                     SUM(cost),
                     AVG(total_tokens)
-                FROM conversations
+                FROM llm_call_records
             """)
             row = cur.fetchone()
     finally:

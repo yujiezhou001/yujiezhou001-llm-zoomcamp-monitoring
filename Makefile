@@ -20,3 +20,7 @@ postgres: network
 
 query:
 	uv run python db_query.py
+
+dashboard:
+	lsof -ti :8502 | xargs -r kill -9 || true
+	uv run streamlit run dashboard.py --server.port 8502
