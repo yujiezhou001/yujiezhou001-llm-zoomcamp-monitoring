@@ -2,11 +2,12 @@ import streamlit as st
 from assistant import create_assistant
 from db_save import save_conversation
 from db_feedback import save_feedback
-
 from judge import evaluate_relevance
-from db_feedback import save_feedback
 
 st.set_page_config(page_title="Course Assistant", page_icon="🎓")
+
+# relevance label -> colored dot
+RELEVANCE_ICON = {"RELEVANT": "🟢", "PARTLY_RELEVANT": "🟡", "NON_RELEVANT": "🔴"}
 
 
 @st.cache_resource
@@ -34,7 +35,7 @@ def record_feedback(index):
     save_feedback(msg["conversation_id"], "user", score=score)
 
 
-# --- replay the conversation (feedback + metrics live here, per answer) ---
+# --- replay the conversation (judge result + user thumbs, per answer) ---
 for i, msg in enumerate(st.session_state.messages):
     with st.chat_message(msg["role"]):
         st.write(msg["content"])
@@ -48,12 +49,17 @@ for i, msg in enumerate(st.session_state.messages):
                 f"💲 {m['cost']:.4f}"
             )
 
+            # LLM-judge evaluation (automatic) — always shown, tucked in an expander
+            ev = msg.get("evaluation")
+            if ev:
+                dot = RELEVANCE_ICON.get(ev["relevance"], "⚪")
+                with st.expander(f"{dot} Judge: {ev['relevance']}"):
+                    st.write(ev["explanation"])
+
+            # user thumbs — shown until the user clicks one
             if msg.get("feedback") is None:
                 st.feedback("thumbs", key=f"fb_{i}",
                             on_change=record_feedback, args=(i,))
-            elif isinstance(msg["feedback"], dict):
-                st.caption("Relevance: " + msg["feedback"].get("relevance", "N/A"))
-                st.caption("Explanation: " + msg["feedback"].get("explanation", "N/A"))
             else:
                 st.caption("👍 Thanks for the feedback!" if msg["feedback"] == 1
                            else "👎 Thanks — noted, we'll use it to improve.")
@@ -69,12 +75,7 @@ if question := st.chat_input("Enter your question…"):
     conversation_id = save_conversation(record, question, "llm-zoomcamp")
 
     relevance, explanation = evaluate_relevance(question, answer)
-    save_feedback(
-        conversation_id,
-        "judge",
-        relevance=relevance,
-        explanation=explanation
-    )
+    save_feedback(conversation_id, "judge", relevance=relevance, explanation=explanation)
 
     st.session_state.messages.append({
         "role": "assistant",
@@ -86,10 +87,7 @@ if question := st.chat_input("Enter your question…"):
             "completion_tokens": record.completion_tokens,
             "cost": record.cost,
         },
-        "feedback": {
-            "relevance": relevance,
-            "explanation": explanation,
-        },
+        "evaluation": {"relevance": relevance, "explanation": explanation},  # judge (auto)
+        "feedback": None,                                                    # user thumbs
     })
-    
     st.rerun()

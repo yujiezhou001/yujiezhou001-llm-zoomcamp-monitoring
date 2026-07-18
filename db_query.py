@@ -70,6 +70,37 @@ def get_conversations(limit=10):
 
     return [row_to_record(row) for row in rows]
 
+def get_relevance_stats():
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT relevance, COUNT(*)
+                FROM feedback
+                WHERE source = 'judge'
+                GROUP BY relevance
+            """)
+            rows = cur.fetchall()
+    finally:
+        conn.close()
+    return dict(rows)
+
+def get_user_feedback_stats():
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT
+                    SUM(CASE WHEN score > 0 THEN 1 ELSE 0 END),
+                    SUM(CASE WHEN score < 0 THEN 1 ELSE 0 END)
+                FROM feedback
+                WHERE source = 'user'
+            """)
+            row = cur.fetchone()
+    finally:
+        conn.close()
+    return row
+
 if __name__ == "__main__":
     records = get_conversations()
     for record in records:
